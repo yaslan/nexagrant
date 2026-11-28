@@ -132,7 +132,7 @@ function toApiRow(topic: TopicWithCall): CallApiRow {
 }
 
 export async function GET(req: Request) {
-  const authRes = await authenticateApiKey(req);
+  const authRes = await authenticateApiKey(req, { action: 'search_calls', feature: 'call_search' });
   if (!authRes.authenticated) {
     return authRes.errorResponse;
   }

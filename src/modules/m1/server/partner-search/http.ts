@@ -72,7 +72,8 @@ async function accessOf(tx: TenantTx, caller: PartnerSearchCaller): Promise<Part
  * doors (`accessOf`, NG-64 / FO-61 bodies), then — for a signed-in member — the NexaGrant plan
  * gate (route-gate.ts), all before the first read or quota unit. A refused role or a closed M1
  * keeps its MODULE_ACCESS_DENIED body; only a caller both doors admit can meet an NG code. The
- * API-key door (/api/v1) has no member to ask: follow-up NG-272 (bindings.ts).
+ * API-key door (/api/v1) has no member to ask here: its plan gate runs in authenticateApiKey, as
+ * SYSTEM_ROLE, before this handler is reached (NG-272, bindings.ts NG_KEY_ROUTES).
  */
 async function admitted(tx: TenantTx, caller: PartnerSearchCaller): Promise<Extract<PartnerSearchAccess, { allowed: true }>> {
   const access = await accessOf(tx, caller);

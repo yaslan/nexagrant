@@ -4,8 +4,7 @@
  * (`src/lib/rbac.ts`); there is no second decision path.
  */
 import type { TenantTx } from '@/lib/db';
-import type { Role } from '@prisma/client';
-import { can, type Action } from '@/lib/rbac';
+import { can, SYSTEM_ROLE, type ActingRole, type Action } from '@/lib/rbac';
 import { isOpenToTenantMembers } from '@/lib/modules/state-machine';
 import type { ModuleId } from '@/lib/modules/types';
 import { grantedFeatures } from './entitlement';
@@ -26,7 +25,8 @@ export const NG_FEATURE_MODULE: Partial<Record<NgFeatureKey, ModuleId>> = {
 
 export interface NgActor {
   tenantId: string;
-  role: Role | null | undefined;
+  /** A member's role, or SYSTEM_ROLE for an API key (NG-272): the key's module is checked by its own door. */
+  role: ActingRole | null | undefined;
 }
 
 /**
@@ -42,7 +42,9 @@ export async function ngPlanDecision(
   state: NgBillingState
 ): Promise<'allowed' | 'module_closed' | 'refused'> {
   if (!actor.role) return 'refused';
-  const moduleId = NG_FEATURE_MODULE[feature];
+  // An API key's module is decided by its own door in authenticateApiKey (the machine viewer:
+  // a PILOT module stays open to a key), so the system actor is judged on the plan alone.
+  const moduleId = actor.role === SYSTEM_ROLE ? undefined : NG_FEATURE_MODULE[feature];
   let moduleOpen: boolean | undefined;
   if (moduleId) {
     const row = await tx.moduleState.findUnique({

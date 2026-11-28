@@ -8,11 +8,24 @@ import { API_KEY_RATE_LIMIT_PER_MINUTE } from '@/lib/api-rate-limit';
 import { checkModuleAccessForTenant } from '@/lib/modules/tenant-access';
 import type { MachineViewer } from '@/lib/modules/state-machine';
 import type { ModuleId } from '@/lib/modules/types';
+import { ngFeatureGate } from '@/lib/billing/nexagrant/gate';
+import type { NgFeatureKey } from '@/lib/billing/nexagrant/features';
+import { SYSTEM_ROLE, type Action } from '@/lib/rbac';
 
 export interface AuthenticatedApiRequest {
   tenantId: string;
   apiKeyId: string;
   name: string;
+}
+
+/**
+ * NG-272: the NexaGrant plan feature a key route serves and the action it asks with. Each
+ * route passes its own (bindings.ts, NG_KEY_ROUTES); `null` marks a route no plan feature
+ * covers, which still passes the M1 door.
+ */
+export interface ApiKeyNgGate {
+  action: Action;
+  feature: NgFeatureKey;
 }
 
 const API_KEY_RATE_WINDOW_MS = 60_000;
@@ -24,7 +37,7 @@ const API_KEY_RATE_WINDOW_MS = 60_000;
  * fails a route that does not call it or calls it after reading data. A new route
  * that skips the call is not refused by anything at runtime.
  */
-const PARTNER_API_MODULE: ModuleId = 'M1';
+export const PARTNER_API_MODULE: ModuleId = 'M1';
 
 /**
  * An API key is not a member, so it acts under a role no membership holds. It is a
@@ -60,8 +73,11 @@ function invalidKey(): { authenticated: false; errorResponse: NextResponse } {
 /**
  * Validates API key from `x-api-key` or `Authorization: Bearer <key>` header,
  * then counts the request against the key's per-minute limit (429 when over).
+ *
+ * `ng` is the route's NexaGrant plan feature (NG-272). It is required, so a new key route
+ * cannot forget it: pass `null` only for a route no plan feature covers.
  */
-export async function authenticateApiKey(req: Request): Promise<
+export async function authenticateApiKey(req: Request, ng: ApiKeyNgGate | null): Promise<
   | { authenticated: true; data: AuthenticatedApiRequest }
   | { authenticated: false; errorResponse: NextResponse }
 > {
@@ -187,6 +203,23 @@ export async function authenticateApiKey(req: Request): Promise<
     // (`assertModuleWrite` in settings/api-keys/actions.ts).
     if (access.limits) {
       return moduleDenied();
+    }
+
+    // NG-272: the tenant's NexaGrant plan must grant this route's feature. The key acts under
+    // SYSTEM_ROLE (no member). A tenant with no NgSubscription row passes (K-584603 = A).
+    if (ng) {
+      const decision = await withTenant(keyRecord.tenantId, (tx) =>
+        ngFeatureGate(tx, { tenantId: keyRecord.tenantId, role: SYSTEM_ROLE }, ng.action, ng.feature)
+      );
+      if (!decision.allowed) {
+        return {
+          authenticated: false,
+          errorResponse: NextResponse.json(
+            { error: 'Forbidden', code: decision.code, feature: decision.feature },
+            { status: 403 }
+          ),
+        };
+      }
     }
 
     return {

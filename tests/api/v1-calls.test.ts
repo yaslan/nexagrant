@@ -75,6 +75,10 @@ vi.mock('../../src/lib/db', () => {
       ),
       update: vi.fn().mockResolvedValue({}),
     },
+    // NG-272: no NgSubscription row, so the NexaGrant gate reads the fallback plan and passes.
+    ngSubscription: { findUnique: vi.fn().mockResolvedValue(null) },
+    ngPlan: { findFirst: vi.fn().mockResolvedValue({ id: 'ng-free' }), findUnique: vi.fn().mockResolvedValue(null) },
+    ngPlanFeature: { findMany: vi.fn().mockResolvedValue([]) },
     topic: {
       findMany: vi.fn(),
     },

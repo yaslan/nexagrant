@@ -15,7 +15,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authRes = await authenticateCordisRequest(req);
+  const authRes = await authenticateCordisRequest(req, { action: 'view_partner_search', feature: 'partner_search' });
   if (!authRes.authenticated) return authRes.errorResponse;
   // NG-250: the NexaGrant plan gate for a signed-in member (partner_search, behind M1).
   if (authRes.session) {
