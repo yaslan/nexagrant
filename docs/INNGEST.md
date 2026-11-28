@@ -20,7 +20,7 @@
   sık koşan bazılarında 3 (`schedule.ts`). Son denemede `defineJob` `source: job-queue` bir `SystemAlert` yazar.
 - **`{ success: false }` dönen iş hata sayılmaz:** `define.ts` bunu `DONE (reported failure)` diye loglar, yeniden
   denemez. Bu işler kendi `SystemAlert`'lerini yazar (örn. `k2-monthly-cordis`, `alerts-sweep`).
-- **Kaçırılan tik:** `fill` penceresi içinde (iş başına `6h` ya da `1d`) geriye dönük koşturulur. `fill`'i olmayan işler (`job-queue-health`, `alerts-ops-digest`, `m17-stale-runs`, `public-lead-stuck`, `notification-email-instant`, `evidence-scan-sweep`; `schedule.ts`) kaçan tiki geriye dönük koşmaz; tik zamanı
+- **Kaçırılan tik:** `fill` penceresi içinde (iş başına `6h` ya da `1d`) geriye dönük koşturulur. `fill`'i olmayan işler (`job-queue-health`, `alerts-ops-digest`, `m17-stale-runs`, `ai-reservation-orphans`, `public-lead-stuck`, `notification-email-instant`, `evidence-scan-sweep`; `schedule.ts`) kaçan tiki geriye dönük koşmaz; tik zamanı
   `payload._cron.ts` ile işe gelir, aylık işler "şimdi"nin değil tikin ayını işler (`monthOf`). Pencereyi aşan kesintiyi
   `job-queue-health` (her saat :05 UTC) `job-queue:<iş>:missed-tick` alarmıyla bildirir. Sınırı ADR-0008 §9.3'te.
 - **Elle tetikleme:** `pnpm jobs:enqueue -- <iş-adı> [--period YYYY-MM] [--month YYYY-MM] [--payload JSON] [--force]`

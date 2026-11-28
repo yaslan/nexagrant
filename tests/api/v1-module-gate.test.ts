@@ -44,6 +44,10 @@ vi.mock('@/lib/db', () => ({
           return db.moduleStatus === null ? null : { status: db.moduleStatus };
         },
       },
+      // NG-272: no NgSubscription row, so the NexaGrant gate passes (K-584603 = A).
+      ngSubscription: { findUnique: async () => null },
+      ngPlan: { findFirst: async () => ({ id: "ng-free" }), findUnique: async () => null },
+      ngPlanFeature: { findMany: async () => [] },
     }),
 }));
 
@@ -56,7 +60,10 @@ import { authenticateApiKey } from '@/lib/api-auth';
 const DENIED_BODY = { error: 'MODULE_ACCESS_DENIED', module: 'M1' };
 
 function call() {
-  return authenticateApiKey(new Request('http://localhost/api/v1/calls', { headers: { 'x-api-key': KEY } }));
+  return authenticateApiKey(
+    new Request('http://localhost/api/v1/calls', { headers: { 'x-api-key': KEY } }),
+    { action: 'search_calls', feature: 'call_search' },
+  );
 }
 
 beforeEach(() => {
@@ -116,6 +123,7 @@ describe('/api/v1 is gated by M1 (module status and plan)', () => {
   test('an unknown key is still 401 and never reaches the module read', async () => {
     const res = await authenticateApiKey(
       new Request('http://localhost/api/v1/calls', { headers: { 'x-api-key': 'fp_live_nope' } }),
+      { action: 'search_calls', feature: 'call_search' },
     );
     expect(res.authenticated).toBe(false);
     if (res.authenticated) return;
@@ -149,7 +157,7 @@ describe('/api/v1 is gated by M1 (module status and plan)', () => {
  * rule is now about the handler itself (TASK-MVDV63H2OCK0, FO-80 review §1-2):
  *
  *   1. every exported HTTP method is an `async function` whose body we can read;
- *   2. its first statement is `const x = await authenticateApiKey(req);`, so no
+ *   2. its first statement is `const x = await authenticateApiKey(req, null);`, so no
  *      call of any kind (a helper, a floating promise) runs before the key check;
  *   3. the very next statement is `if (!x.authenticated) … return`.
  *
@@ -158,7 +166,8 @@ describe('/api/v1 is gated by M1 (module status and plan)', () => {
  */
 const HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 const DATA_ACCESS = /\b(withTenant|withSystemScope|prisma)\s*[.(]/;
-const AUTH_GUARD = /const (\w+) = await authenticateApiKey\(req\);\s*if \(!\1\.authenticated\)\s*\{?\s*return\b/;
+// The second argument is the route's NexaGrant gate (NG-272): an object literal, or `null` for a route no feature covers.
+const AUTH_GUARD = /const (\w+) = await authenticateApiKey\(req, (?:\{[^}]*\}|null)\);\s*if \(!\1\.authenticated\)\s*\{?\s*return\b/;
 
 /** Comments are dropped, so a `prisma.` or an `await` in a doc comment does not count. */
 function codeOf(src: string): string {
@@ -203,7 +212,7 @@ function authOrderProblems(source: string): string[] {
 
     const guard = AUTH_GUARD.exec(body);
     if (!guard) {
-      problems.push(`${method}: no \`const x = await authenticateApiKey(req); if (!x.authenticated) return\``);
+      problems.push(`${method}: no \`const x = await authenticateApiKey(req, null); if (!x.authenticated) return\``);
       continue;
     }
     const leadingWhitespace = body.length - body.trimStart().length;
@@ -246,7 +255,7 @@ describe('the route scan itself refuses the wrong orders', () => {
   const GOOD = `
     export async function GET(req: Request, { params }: { params: Promise<{ pic: string }> }) {
       // await something() in a comment is not code
-      const authRes = await authenticateApiKey(req);
+      const authRes = await authenticateApiKey(req, null);
       if (!authRes.authenticated) {
         return authRes.errorResponse;
       }
@@ -263,7 +272,7 @@ describe('the route scan itself refuses the wrong orders', () => {
       'a helper read before the auth call (no prisma/withTenant text)',
       `export async function GET(req: Request) {
         const rows = await coordinatorLeaders({});
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         if (!authRes.authenticated) return authRes.errorResponse;
         return NextResponse.json(rows);
       }`,
@@ -272,36 +281,36 @@ describe('the route scan itself refuses the wrong orders', () => {
     [
       'the auth result is never checked',
       `export async function GET(req: Request) {
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         const rows = await coordinatorLeaders({ tenant: authRes });
         return NextResponse.json(rows);
       }`,
-      'no `const x = await authenticateApiKey(req); if (!x.authenticated) return`',
+      'no `const x = await authenticateApiKey(req, null); if (!x.authenticated) return`',
     ],
     [
       'the check comes after another statement',
       `export async function GET(req: Request) {
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         const rows = await coordinatorLeaders({});
         if (!authRes.authenticated) return authRes.errorResponse;
         return NextResponse.json(rows);
       }`,
-      'no `const x = await authenticateApiKey(req); if (!x.authenticated) return`',
+      'no `const x = await authenticateApiKey(req, null); if (!x.authenticated) return`',
     ],
     [
       'the check tests a different variable',
       `export async function GET(req: Request) {
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         if (!other.authenticated) return other.errorResponse;
         return NextResponse.json([]);
       }`,
-      'no `const x = await authenticateApiKey(req); if (!x.authenticated) return`',
+      'no `const x = await authenticateApiKey(req, null); if (!x.authenticated) return`',
     ],
     [
       'a helper call without await before the auth call (no prisma/withTenant text)',
       `export async function GET(req: Request) {
         const pending = coordinatorLeaders({});
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         if (!authRes.authenticated) return authRes.errorResponse;
         return NextResponse.json(await pending);
       }`,
@@ -311,7 +320,7 @@ describe('the route scan itself refuses the wrong orders', () => {
       'a floating prisma read started before the auth call',
       `export async function GET(req: Request) {
         const pending = prisma.topic.findMany();
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         if (!authRes.authenticated) return authRes.errorResponse;
         return NextResponse.json(await pending);
       }`,
@@ -326,7 +335,7 @@ describe('the route scan itself refuses the wrong orders', () => {
     [
       'a handler exported through an export list (`as POST`)',
       `export async function GET(req: Request) {
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         if (!authRes.authenticated) return authRes.errorResponse;
         return NextResponse.json([]);
       }
@@ -337,7 +346,7 @@ describe('the route scan itself refuses the wrong orders', () => {
     [
       'a handler exported by destructuring (NextAuth `export const { GET, POST } = handlers`)',
       `export async function GET(req: Request) {
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         if (!authRes.authenticated) return authRes.errorResponse;
         return NextResponse.json([]);
       }
@@ -347,7 +356,7 @@ describe('the route scan itself refuses the wrong orders', () => {
     [
       'a handler re-exported from another module (`export * from`)',
       `export async function GET(req: Request) {
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         if (!authRes.authenticated) return authRes.errorResponse;
         return NextResponse.json([]);
       }
@@ -362,7 +371,7 @@ describe('the route scan itself refuses the wrong orders', () => {
     const bad = `${GOOD}
       export async function POST(req: Request) {
         const body = await req.json();
-        const authRes = await authenticateApiKey(req);
+        const authRes = await authenticateApiKey(req, null);
         if (!authRes.authenticated) return authRes.errorResponse;
         return NextResponse.json(body);
       }`;

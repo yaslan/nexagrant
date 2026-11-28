@@ -153,6 +153,61 @@ export const NG_ROUTE_BINDINGS: readonly NgRouteBinding[] = [
   },
 ];
 
+/**
+ * NG-272: the API-key doors. A key has no member, so its route passes the feature to
+ * `authenticateApiKey` (or `authenticateCordisRequest`) as a literal, and that call runs the
+ * plan gate as SYSTEM_ROLE. `door: 'api'` is a `/api/v1` handler; `door: 'cordis'` is a
+ * `/api/cordis` handler, whose key branch takes the same gate. `feature: null` marks a route
+ * no plan feature covers, with the reason; bindings.test.ts checks the literal in each file
+ * matches this table, and that every `/api/v1` route is listed.
+ */
+export interface NgKeyRoute {
+  door: 'api' | 'cordis';
+  file: string;
+  feature: NgFeatureKey | null;
+  action: Action | null;
+  /** Why a key route has no feature (feature null only). */
+  reason?: string;
+}
+
+const PARTNER_KEY_ACTION = 'view_partner_search' as const;
+
+export const NG_KEY_ROUTES: readonly NgKeyRoute[] = [
+  { door: 'api', file: 'src/app/api/v1/calls/route.ts', feature: 'call_search', action: 'search_calls' },
+  { door: 'api', file: 'src/app/api/v1/partners/route.ts', feature: 'partner_search', action: PARTNER_KEY_ACTION },
+  { door: 'api', file: 'src/app/api/v1/partners/[pic]/route.ts', feature: 'partner_search', action: PARTNER_KEY_ACTION },
+  { door: 'api', file: 'src/app/api/v1/partners/leaders/route.ts', feature: 'partner_search', action: PARTNER_KEY_ACTION },
+  {
+    door: 'api',
+    file: 'src/app/api/v1/organizations/[pic]/announcements/route.ts',
+    feature: 'partner_search',
+    action: PARTNER_KEY_ACTION,
+  },
+  {
+    door: 'api',
+    file: 'src/app/api/v1/topics/[identifier]/partner-signal/route.ts',
+    feature: 'partner_search',
+    action: PARTNER_KEY_ACTION,
+  },
+  {
+    door: 'api',
+    file: 'src/app/api/v1/partner-search/announcements/route.ts',
+    feature: 'partner_search',
+    action: PARTNER_KEY_ACTION,
+  },
+  {
+    door: 'api',
+    file: 'src/app/api/v1/opportunities/route.ts',
+    feature: null,
+    action: null,
+    reason:
+      'Open question to PM (NG-272 report): the opportunity pipeline of the key tenant is not a NexaGrant plan feature in the catalog, so the key passes the M1 door only.',
+  },
+  { door: 'cordis', file: 'src/app/api/cordis/organizations/route.ts', feature: 'partner_search', action: PARTNER_KEY_ACTION },
+  { door: 'cordis', file: 'src/app/api/cordis/organizations/[id]/route.ts', feature: 'partner_search', action: PARTNER_KEY_ACTION },
+  { door: 'cordis', file: 'src/app/api/cordis/projects/route.ts', feature: 'similar_projects', action: PARTNER_KEY_ACTION },
+];
+
 /** Features with no product route to gate today, each with the reason. */
 export const NG_UNBOUND_FEATURES: Readonly<Partial<Record<NgFeatureKey, string>>> = {
   org_profile: 'Granted on every tier, Ücretsiz Kontrol included; a gate would never refuse.',
@@ -174,9 +229,6 @@ export const NG_UNBOUND_FEATURES: Readonly<Partial<Record<NgFeatureKey, string>>
  */
 const M8_CONSORTIUM =
   "Consortium building (M8, behind moduleGate('M8') + view_proposal): suggests CORDIS partners for one of the tenant's own proposals. Not the partner_search directory, and M8 is behind no NexaGrant plan feature (NG_FEATURE_MODULE). Open question to PM in the NG-250 report.";
-const API_KEY_PATH =
-  'API key path (/api/v1): no member session to ask. Review O2, follow-up NG-272 (gate with the key tenant; to land with or before open question 1).';
-
 export const NG_DATA_FILE_EXCEPTIONS: Readonly<Record<string, string>> = {
   'src/app/[locale]/(app)/[workspace]/opportunities/[id]/matching/page.tsx': M8_CONSORTIUM,
   'src/app/[locale]/(app)/[workspace]/pipeline/[id]/consortium/page.tsx': M8_CONSORTIUM,
@@ -191,10 +243,4 @@ export const NG_DATA_FILE_EXCEPTIONS: Readonly<Record<string, string>> = {
     'Platform admin (Partner Search moderation), not a tenant member: the NexaGrant plan gates tenant members.',
   'src/app/[locale]/admin/tenants/[tenantId]/page.tsx':
     "Platform admin tenant detail: shows a tenant's own PIC organisation to platform staff; no tenant member, no plan.",
-  'src/app/api/v1/partners/route.ts': API_KEY_PATH,
-  'src/app/api/v1/partners/[pic]/route.ts': API_KEY_PATH,
-  'src/app/api/v1/organizations/[pic]/announcements/route.ts': API_KEY_PATH,
-  'src/app/api/v1/topics/[identifier]/partner-signal/route.ts': API_KEY_PATH,
-  'src/app/api/v1/partner-search/announcements/route.ts': API_KEY_PATH,
-  'src/app/api/v1/partners/leaders/route.ts': API_KEY_PATH,
 };

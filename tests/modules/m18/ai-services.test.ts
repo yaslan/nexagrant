@@ -108,7 +108,7 @@ describe('proposeEnrichment', () => {
     expect(credits.reserve.mock.invocationCallOrder[0]!).toBeLessThan(generate.mock.invocationCallOrder[0]!);
     expect(credits.release).not.toHaveBeenCalled();
     const opts = generate.mock.calls[0]![0] as { module: string; purpose: string; tenantId: string; system: string; prompt: string };
-    expect(opts).toMatchObject({ module: 'M18', purpose: 'enrich-organization-attempt', tenantId: 't1', creditsReserved: true });
+    expect(opts).toMatchObject({ module: 'M18', purpose: 'enrich-organization-attempt', tenantId: 't1', creditsReserved: true, reservationRefId: 'ref:enrich-organization' });
     expect(opts.system).not.toContain('Acme Teknoloji');
     expect(opts.prompt).toContain('<user_data field="pages">');
   });
@@ -211,7 +211,7 @@ describe('eligibility pre-report', () => {
     const save = vi.fn(async (_input: unknown) => ({ id: 'r1' }));
     const saved = await createEligibilityReport({ tenantId: 't1', userId: 'u1', subject, locale: 'tr' }, { generate, credits, save });
     expect(credits.reserve).toHaveBeenCalledWith('t1', 'eligibility-pre-report');
-    expect(generate.mock.calls[0]![0]).toMatchObject({ module: 'M18', purpose: 'eligibility-pre-report-attempt', creditsReserved: true });
+    expect(generate.mock.calls[0]![0]).toMatchObject({ module: 'M18', purpose: 'eligibility-pre-report-attempt', creditsReserved: true, reservationRefId: 'ref:eligibility-pre-report' });
     expect(save).toHaveBeenCalledWith({
       organizationId: 'org-1',
       callId: 'call-1',

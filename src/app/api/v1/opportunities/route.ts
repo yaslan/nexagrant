@@ -32,7 +32,7 @@ interface OpportunityApiRow {
 }
 
 export async function GET(req: Request) {
-  const authRes = await authenticateApiKey(req);
+  const authRes = await authenticateApiKey(req, null);
   if (!authRes.authenticated) {
     return authRes.errorResponse;
   }

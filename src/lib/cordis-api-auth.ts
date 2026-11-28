@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { authenticateApiKey } from '@/lib/api-auth';
+import { authenticateApiKey, type ApiKeyNgGate } from '@/lib/api-auth';
 import { internalError } from '@/lib/api-error';
 import { checkModuleAccess } from '@/lib/modules/access';
 import { logger } from '@/lib/logger';
@@ -37,15 +37,17 @@ function moduleDenied(): CordisAuthResult {
  *
  * - An API key (`x-api-key` or `Authorization`) goes through `authenticateApiKey`
  *   unchanged, so the key lookup, the per-key limit, the M1 gate and the refusal
- *   of a limited plan are the ones /api/v1 runs. A key that is present but wrong
+ *   of a limited plan are the ones /api/v1 runs, and `ng` (NG-272) is the route's
+ *   NexaGrant plan feature, checked there too. A key that is present but wrong
  *   is a 401 here; it never falls through to the session.
  * - No key: a signed-in member whose tenant opens M1 in full. Anonymous is 401; a
  *   plan without M1, or with M1 only in limited form, is 403 (as for a key); past
- *   the per-user limit is 429 with Retry-After.
+ *   the per-user limit is 429 with Retry-After. The route checks `ng` for a member
+ *   itself (ngGateResponse), from the `session` this returns.
  */
-export async function authenticateCordisRequest(req: Request): Promise<CordisAuthResult> {
+export async function authenticateCordisRequest(req: Request, ng: ApiKeyNgGate | null): Promise<CordisAuthResult> {
   if (req.headers.get('x-api-key') || req.headers.get('Authorization')) {
-    const keyAuth = await authenticateApiKey(req);
+    const keyAuth = await authenticateApiKey(req, ng);
     return keyAuth.authenticated ? { authenticated: true } : keyAuth;
   }
 

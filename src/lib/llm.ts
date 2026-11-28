@@ -214,6 +214,12 @@ export type LlmGenerateOptions = {
    * the price itself, under the tenant credit lock, before the provider is called (FO-288).
    */
   creditsReserved?: boolean;
+  /**
+   * NG-387: the refId of the reservation a `creditsReserved` caller holds (M18:
+   * `withM18Reservation`). Written to `AiUsageLog.refId` when the answer is complete, the delivery
+   * marker the ai-reservation-orphans job reads. A call that reserves itself marks its own refId.
+   */
+  reservationRefId?: string;
 } & (
   | { prompt: string; system?: string; messages?: never }
   | { messages: LlmMessage[]; prompt?: never; system?: never }
@@ -914,6 +920,9 @@ export async function generateCompletion(options: LlmGenerateOptions): Promise<L
           credits,
           proposalId: options.proposalId,
           section: options.section,
+          // NG-387: the delivery marker. Only a complete answer delivered the reservation; a
+          // cut-off or refused one is refunded below and must not look delivered.
+          refId: outcome === 'complete' ? (options.reservationRefId ?? reservation ?? null) : null,
         },
       });
       // NG-271: the usage row now counts this call; its hold goes in the same transaction, so the

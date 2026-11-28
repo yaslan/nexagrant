@@ -3,7 +3,7 @@ import { apiKeyCaller, listAnnouncements } from '@/modules/m1/server/partner-sea
 
 /** Partner REST API twin of GET /api/partner-search/announcements (FO-61). */
 export async function GET(req: Request) {
-  const auth = await authenticateApiKey(req);
+  const auth = await authenticateApiKey(req, { action: 'view_partner_search', feature: 'partner_search' });
   if (!auth.authenticated) return auth.errorResponse;
   return listAnnouncements(apiKeyCaller(auth.data.tenantId), req);
 }

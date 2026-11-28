@@ -159,6 +159,7 @@ export class EmptyEligibilityAnswerError extends Error {
 async function draftEligibilityReport(
   input: { tenantId: string; userId: string; subject: EligibilitySubject; locale: string },
   generate: (options: LlmGenerateOptions) => Promise<LlmCompletion>,
+  reservationRefId: string,
 ): Promise<EligibilityDraft> {
   const request = separatedPrompt(
     'm18/eligibility-pre-report',
@@ -173,6 +174,8 @@ async function draftEligibilityReport(
     purpose: attemptPurpose(ELIGIBILITY_PURPOSE),
     // The price was reserved by createEligibilityReport; llm.ts logs this call at 0 credits.
     creditsReserved: true,
+    // NG-387: marks the reservation delivered (AiUsageLog.refId) for the orphan sweep.
+    reservationRefId,
     ...request,
   });
   const content = completion.text.trim().slice(0, MAX_REPORT_CHARS);
@@ -195,8 +198,8 @@ export async function createEligibilityReport(
   return withM18Reservation(
     tenantId,
     ELIGIBILITY_PURPOSE,
-    async ({ credits }) => {
-      const draft = await draftEligibilityReport(input, deps.generate ?? generateCompletion);
+    async ({ refId, credits }) => {
+      const draft = await draftEligibilityReport(input, deps.generate ?? generateCompletion, refId);
       const saved = await save({ organizationId: subject.org.id, callId: subject.call.id, userId, locale, draft });
       return { keep: true, value: { id: saved.id, credits } };
     },
