@@ -15,10 +15,11 @@
  *   • is older than `olderThanMinutes` (RESERVATION_ORPHAN_MINUTES, default 60: longer than any
  *     M18 action), so a running action is not touched;
  *   • has no `refund:<module>` row and no AiUsageLog row with the same tenant and refId;
- *   • is not older than the module's FIRST delivery marker. Rows reserved before the marker
- *     existed (before NG-387 shipped) carry no marker even when delivered; nothing can tell a
- *     delivered one from an orphan, so they are left alone. Until the first marker of a module
- *     exists, nothing of that module is refunded.
+ *   • is created at or after ORPHAN_SWEEP_SINCE (env, the NG-387 deploy instant), the cut-off.
+ *     The cut-off is fixed in the environment, never derived from the data (no "first marker"
+ *     floor: a later marker would then drop an older orphan). Rows before the cut-off predate the
+ *     delivery marker and may have been delivered; nothing can prove they were not, so they are
+ *     never touched. A blank cut-off refunds nothing at all (skipped: 'no-cutoff').
  *
  * Only M18. M17 runs have their own sweeper (m17-stale-runs, FO-317) keyed on the analysis row:
  * an M17 run never writes a marker (its refId is `runRef(id, claim)`), so this sweep must never

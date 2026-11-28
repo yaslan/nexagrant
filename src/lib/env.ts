@@ -16,6 +16,27 @@ function blankToUndefined<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess((value) => (typeof value === 'string' && value.trim() === '' ? undefined : value), schema);
 }
 
+/**
+ * True only when a UTC ISO timestamp names a real calendar instant. `Date.parse` rolls an
+ * impossible day over (`2026-02-31T00:00:00Z` becomes 3 March), so the parsed instant's fields are
+ * compared with the written ones: any rollover or out-of-range field makes them differ.
+ */
+export function isRealUtcTimestamp(value: string): boolean {
+  const written = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(value);
+  const ms = Date.parse(value);
+  if (!written || Number.isNaN(ms)) return false;
+  const at = new Date(ms);
+  const second = written[6] === undefined ? 0 : Number(written[6]); // seconds are optional (`09:00Z`)
+  return (
+    at.getUTCFullYear() === Number(written[1]) &&
+    at.getUTCMonth() + 1 === Number(written[2]) &&
+    at.getUTCDate() === Number(written[3]) &&
+    at.getUTCHours() === Number(written[4]) &&
+    at.getUTCMinutes() === Number(written[5]) &&
+    at.getUTCSeconds() === second
+  );
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: optionalUrl,
@@ -390,7 +411,7 @@ const envSchema = z.object({
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?Z$/,
         'ORPHAN_SWEEP_SINCE must be an ISO-8601 UTC timestamp ending in Z, e.g. 2026-12-01T09:00:00Z',
       )
-      .refine((value) => !Number.isNaN(Date.parse(value)), 'ORPHAN_SWEEP_SINCE is not a valid date')
+      .refine(isRealUtcTimestamp, 'ORPHAN_SWEEP_SINCE is not a real UTC date and time (e.g. 2026-02-31 does not exist)')
       .optional()
   ),
   /**

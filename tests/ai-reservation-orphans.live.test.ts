@@ -232,9 +232,12 @@ describe.skipIf(!HAS_DB)('orphaned M18 credit reservations (NG-387, live, fabrik
       return { keep: true, value: null };
     });
     vi.unstubAllGlobals();
-    // Date the delivered action two hours before T0, so the sweep sees it as old enough.
-    await admin.creditLedger.updateMany({ where: { refId: requireId(refs.delivered, 'delivered refId') }, data: { createdAt: twoHoursBefore } });
-    await admin.aiUsageLog.updateMany({ where: { refId: requireId(refs.delivered, 'delivered refId') }, data: { createdAt: twoHoursBefore } });
+    // Date the delivered action 100 minutes before T0: its delivery marker is then LATER than the
+    // orphan (T0-120 min). A sweep that cut at the module's first marker would drop the orphan here;
+    // at T0-120 min the marker would share the orphan's instant and the regression would go unseen.
+    const hundredMinBefore = new Date(T0.getTime() - 100 * MIN);
+    await admin.creditLedger.updateMany({ where: { refId: requireId(refs.delivered, 'delivered refId') }, data: { createdAt: hundredMinBefore } });
+    await admin.aiUsageLog.updateMany({ where: { refId: requireId(refs.delivered, 'delivered refId') }, data: { createdAt: hundredMinBefore } });
 
     // ii. Orphaned: reserved two hours before T0, then the process died (no marker, no refund).
     // (refs.orphan was created in step 0, with the same date.)
@@ -245,9 +248,11 @@ describe.skipIf(!HAS_DB)('orphaned M18 credit reservations (NG-387, live, fabrik
     owners.young = await makeTenant('young');
     refs.young = await reservation(owners.young, new Date(T0.getTime() - 30 * MIN));
     // vi. Reserved 40 days before T0: before the cut-off, so it may predate the marker.
+    // No delivery marker exists before the orphan (T0-120 min) in this suite.
     owners.history = await makeTenant('history');
     refs.history = await reservation(owners.history, new Date(T0.getTime() - 40 * 24 * 60 * MIN));
     // vii. Another tenant's action, delivered 90 minutes before T0: its marker is LATER than the orphan.
+    // No delivery marker exists before the orphan (T0-120 min) in this suite.
     owners.late = await makeTenant('late');
     const lateAt = new Date(T0.getTime() - 90 * MIN);
     refs.late = await reservation(owners.late, lateAt);
